@@ -1,19 +1,33 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  Mode, 
-  Screen, 
-  AnalysisResult, 
-  DetailLevel, 
+import {
+  Mode,
+  Screen,
+  AnalysisResult,
+  DetailLevel,
   UserSettings,
   UserTier,
-  QueuedAnalysis
+  QueuedAnalysis,
+  CustomLibraryItem
 } from './types';
 import { COLORS, FREE_TIER_LIMIT, STRIPE_CONFIG, SUBSCRIPTION_PRODUCTS, PRIVACY_POLICY, TERMS_OF_SERVICE, LIBRARY_RESOURCES } from './constants';
 import RiskMeter from './components/RiskMeter';
 import Paywall from './components/Paywall';
 import PaymentSheet from './components/PaymentSheet';
+import Toast, { ToastType } from './components/Toast';
+import AddLibraryItemModal from './components/AddLibraryItemModal';
 import { analyzeMessage } from './services/geminiService';
+import { sendCoachMessage } from './services/coachService';
+import { ttsService } from './services/ttsService';
+import {
+  takePhoto,
+  pickImage,
+  shareContent,
+  openUrl,
+  copyToClipboard,
+  triggerHaptic,
+  isNativePlatform
+} from './services/capacitorService';
 import { 
   Home as HomeIcon, 
   Clock, 
@@ -91,10 +105,21 @@ const App: React.FC = () => {
   // Coaching state
   const [coachInput, setCoachInput] = useState('');
   const [coachHistory, setCoachHistory] = useState<{ role: 'user' | 'bot', text: string }[]>([]);
-  
+  const [isCoachLoading, setIsCoachLoading] = useState(false);
+
   // Offline state
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [queuedAnalyses, setQueuedAnalyses] = useState<QueuedAnalysis[]>([]);
+
+  // Toast notifications
+  const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
+
+  // Image preview modal
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+
+  // Custom library items
+  const [customLibraryItems, setCustomLibraryItems] = useState<CustomLibraryItem[]>([]);
+  const [showAddLibraryModal, setShowAddLibraryModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -136,7 +161,7 @@ const App: React.FC = () => {
       if (parsed.length > MAX_HISTORY_ITEMS) parsed = parsed.slice(0, MAX_HISTORY_ITEMS);
       setHistory(parsed);
     }
-    
+
     const savedSettings = localStorage.getItem('wtm_settings');
     if (savedSettings) {
       const parsed = JSON.parse(savedSettings);
@@ -145,6 +170,9 @@ const App: React.FC = () => {
 
     const savedQueue = localStorage.getItem('wtm_queue');
     if (savedQueue) setQueuedAnalyses(JSON.parse(savedQueue));
+
+    const savedCustomLibrary = localStorage.getItem('wtm_custom_library');
+    if (savedCustomLibrary) setCustomLibraryItems(JSON.parse(savedCustomLibrary));
   }, []);
 
   useEffect(() => {
@@ -158,6 +186,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('wtm_queue', JSON.stringify(queuedAnalyses));
   }, [queuedAnalyses]);
+
+  useEffect(() => {
+    localStorage.setItem('wtm_custom_library', JSON.stringify(customLibraryItems));
+  }, [customLibraryItems]);
 
   // Handle Connectivity
   useEffect(() => {
@@ -198,6 +230,19 @@ const App: React.FC = () => {
     if (isOnline && queuedAnalyses.length > 0) processQueue();
   }, [isOnline, queuedAnalyses.length, processQueue]);
 
+  // Toast helper
+  const showToast = (message: string, type: ToastType) => {
+    setToast({ message, type });
+  };
+
+  // TTS helper - speak analysis results
+  const speakAnalysis = (analysis: AnalysisResult) => {
+    if (!settings.audioOutput || !ttsService.isAvailable()) return;
+
+    const textToSpeak = `The message clarity score is ${analysis.clarityScore.score} out of 5. ${analysis.clarityScore.explanation}. Translation: ${analysis.whatWasSaid}`;
+    ttsService.speak(textToSpeak, { rate: settings.audioSpeed });
+  };
+
   // Handlers
   const handleStartAnalysis = async () => {
     if (settings.tier === UserTier.FREE && settings.analysesCount >= FREE_TIER_LIMIT) {
@@ -206,7 +251,9 @@ const App: React.FC = () => {
     }
     if (!inputText.trim() && !selectedImage && !selectedAudio) return;
     if (!selectedMode) return;
-    
+
+    await triggerHaptic('medium');
+
     if (!isOnline) {
       const newQueued: QueuedAnalysis = {
         id: Math.random().toString(36).substr(2, 9),
@@ -217,7 +264,7 @@ const App: React.FC = () => {
         audio: selectedAudio || undefined
       };
       setQueuedAnalyses(prev => [...prev, newQueued]);
-      alert("You're offline. Analysis will run when you reconnect.");
+      showToast('Offline - Added to queue. Will analyze when online.', 'offline');
       setScreen('HOME');
       setInputText('');
       setSelectedImage(null);
@@ -236,9 +283,15 @@ const App: React.FC = () => {
       setInputText('');
       setSelectedImage(null);
       setSelectedAudio(null);
-    } catch (error) {
+
+      // Speak results if audio output is enabled
+      speakAnalysis(result);
+      await triggerHaptic('light');
+    } catch (error: any) {
       console.error(error);
-      alert("Error analyzing message.");
+      const errorMsg = error?.message || 'Could not analyze message. Please try again.';
+      showToast(errorMsg, 'error');
+      // Stay on INPUT screen so user can retry without losing their input
       setScreen('INPUT');
     } finally {
       setIsAnalyzing(false);
@@ -277,14 +330,47 @@ const App: React.FC = () => {
   };
 
   const handleCoachSubmit = async () => {
-    if (!coachInput.trim()) return;
+    if (!coachInput.trim() || isCoachLoading) return;
+
     const userMsg = coachInput;
     setCoachInput('');
     setCoachHistory(prev => [...prev, { role: 'user', text: userMsg }]);
-    
-    setTimeout(() => {
-      setCoachHistory(prev => [...prev, { role: 'bot', text: "That's a great question. When prepping for social situations, remember that it's okay to ask for clarity. Would you like me to roleplay a specific response with you?" }]);
-    }, 1000);
+    setIsCoachLoading(true);
+
+    await triggerHaptic('light');
+
+    try {
+      const response = await sendCoachMessage(userMsg, coachHistory);
+      setCoachHistory(prev => [...prev, { role: 'bot', text: response }]);
+
+      // Speak coach response if audio is enabled
+      if (settings.audioOutput && ttsService.isAvailable()) {
+        ttsService.speak(response, { rate: settings.audioSpeed });
+      }
+    } catch (error) {
+      console.error('Coach error:', error);
+      showToast('Could not reach coach. Please try again.', 'error');
+    } finally {
+      setIsCoachLoading(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    await triggerHaptic('light');
+    const photo = await takePhoto();
+    if (photo) {
+      setSelectedImage(photo);
+      showToast('Photo captured', 'success');
+    }
+  };
+
+  const handlePickImage = async () => {
+    await triggerHaptic('light');
+    const image = await pickImage();
+    if (image) {
+      setSelectedImage(image);
+      showToast('Image selected', 'success');
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,6 +380,7 @@ const App: React.FC = () => {
       reader.onloadend = () => {
         const base64 = (reader.result as string).split(',')[1];
         setSelectedImage({ data: base64, mimeType: file.type });
+        showToast('Image selected', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -301,13 +388,72 @@ const App: React.FC = () => {
 
   const handleShare = async () => {
     if (!currentAnalysis) return;
+    await triggerHaptic('medium');
     const textToShare = `WTM Decoding:\n\nMessage: ${currentAnalysis.originalMessage}\n\nTranslation: ${currentAnalysis.whatWasSaid}`;
-    if (navigator.share) {
-      await navigator.share({ title: 'WTM Analysis', text: textToShare });
+
+    const shared = await shareContent('WTM Analysis', textToShare);
+    if (shared) {
+      showToast('Shared successfully', 'success');
     } else {
-      navigator.clipboard.writeText(textToShare);
-      alert("Copied to clipboard!");
+      // Fallback to clipboard
+      const copied = await copyToClipboard(textToShare);
+      if (copied) {
+        showToast('Copied to clipboard', 'success');
+      } else {
+        showToast('Could not share', 'error');
+      }
     }
+  };
+
+  const handleCopyResponse = async (text: string) => {
+    await triggerHaptic('light');
+    const copied = await copyToClipboard(text);
+    if (copied) {
+      showToast('Copied to clipboard', 'success');
+    } else {
+      showToast('Could not copy', 'error');
+    }
+  };
+
+  const handleAddLibraryItem = (item: Omit<CustomLibraryItem, 'id' | 'createdAt'>) => {
+    const newItem: CustomLibraryItem = {
+      ...item,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: Date.now()
+    };
+    setCustomLibraryItems(prev => [newItem, ...prev]);
+    showToast('Resource added to library', 'success');
+    triggerHaptic('medium');
+  };
+
+  const handleDeleteLibraryItem = async (id: string) => {
+    if (confirm('Delete this resource from your library?')) {
+      setCustomLibraryItems(prev => prev.filter(item => item.id !== id));
+      showToast('Resource removed', 'success');
+      await triggerHaptic('light');
+    }
+  };
+
+  const handleViewLibraryItem = async (item: CustomLibraryItem) => {
+    await triggerHaptic('light');
+    if (item.type === 'url' && item.url) {
+      await openUrl(item.url);
+    } else if (item.type === 'file' && item.fileData) {
+      // Create a blob URL and open it
+      const blob = base64ToBlob(item.fileData, item.mimeType || 'application/octet-stream');
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, '_blank');
+    }
+  };
+
+  // Helper to convert base64 to blob
+  const base64ToBlob = (base64: string, mimeType: string): Blob => {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteArrays.push(byteCharacters.charCodeAt(i));
+    }
+    return new Blob([new Uint8Array(byteArrays)], { type: mimeType });
   };
 
   const themeClass = settings.darkMode ? 'dark bg-[#1A1A1A] text-white' : 'bg-[#8FAD9C] text-black';
@@ -316,10 +462,11 @@ const App: React.FC = () => {
 
   const AppIcon = ({ size = 64 }) => (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-2xl">
-        <path d="M50 18C28 18 10 32 10 50C10 60 16 68 25 74L20 88L40 80C43 81 46.5 82 50 82C72 82 90 68 90 50C90 32 72 18 50 18Z" fill={COLORS.DARK_PURPLE} />
-        <circle cx="50" cy="50" r="18" fill="none" stroke={COLORS.BLACK} strokeWidth="4" />
-      </svg>
+      <img
+        src="./assets/images/Logo for WTM.png"
+        alt="What They Meant Logo"
+        className="w-full h-full object-contain drop-shadow-2xl"
+      />
     </div>
   );
 
@@ -353,6 +500,13 @@ const App: React.FC = () => {
     </header>
   );
 
+  // Apply default mode on mount
+  useEffect(() => {
+    if (screen === 'HOME' && !selectedMode && settings.defaultMode) {
+      setSelectedMode(settings.defaultMode);
+    }
+  }, [screen]);
+
   const renderHome = () => (
     <div className={`min-h-screen flex flex-col screen-enter ${themeClass}`}>
       {renderHeader("Decoder", false)}
@@ -364,7 +518,7 @@ const App: React.FC = () => {
             { id: Mode.SCHOOL, icon: <Backpack size={24} />, label: 'School', sub: 'Assignments & academic requests' },
             { id: Mode.SOCIAL, icon: <Users size={24} />, label: 'Social', sub: 'Texts from friends & relationships' },
           ].map(m => (
-            <button key={m.id} onClick={() => setSelectedMode(m.id as Mode)} className={`w-full p-6 rounded-2xl border-2 text-left flex items-start gap-4 transition-all ${selectedMode === m.id ? 'bg-[#5B4A8F] text-white border-black scale-[1.02]' : `${cardClass} border-transparent shadow-sm`}`}>
+            <button key={m.id} onClick={async () => { await triggerHaptic('light'); setSelectedMode(m.id as Mode); }} className={`w-full p-6 rounded-2xl border-2 text-left flex items-start gap-4 transition-all ${selectedMode === m.id ? 'bg-[#5B4A8F] text-white border-black scale-[1.02]' : `${cardClass} border-transparent shadow-sm`}`}>
               <div className={`p-3 rounded-xl ${selectedMode === m.id ? 'bg-white/20' : (settings.darkMode ? 'bg-[#3D3D3D] text-[#C4B5D9]' : 'bg-slate-100 text-[#5B4A8F]')}`}>{m.icon}</div>
               <div><p className="font-lexend font-bold text-lg">{m.label}</p><p className={`font-opendyslexic text-sm ${selectedMode === m.id ? 'opacity-80' : 'opacity-60'}`}>{m.sub}</p></div>
             </button>
@@ -382,8 +536,95 @@ const App: React.FC = () => {
     <div className={`min-h-screen flex flex-col screen-enter ${themeClass}`}>
       {renderHeader("Library")}
       <main className="flex-1 p-6 space-y-10 pb-24 overflow-y-auto">
+        {/* Custom Library Items */}
+        {customLibraryItems.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-lexend font-bold text-2xl">My Resources</h2>
+                <p className="font-opendyslexic text-sm opacity-60">Your personal collection</p>
+              </div>
+              <button
+                onClick={async () => {
+                  await triggerHaptic('light');
+                  setShowAddLibraryModal(true);
+                }}
+                className="w-12 h-12 rounded-full bg-[#5B4A8F] text-white flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                title="Add resource"
+              >
+                <span className="text-2xl font-bold">+</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-4">
+              {customLibraryItems.map((item) => {
+                const ResourceIcon = item.icon === 'Brain' ? Brain : item.icon === 'Briefcase' ? Briefcase : item.icon === 'Book' ? Book : MessageCircle;
+                return (
+                  <div key={item.id} className={`p-6 rounded-2xl border-2 ${cardClass} border-transparent hover:border-[#5B4A8F] transition-all relative group`}>
+                    <button
+                      onClick={() => handleViewLibraryItem(item)}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 rounded-xl bg-[#5B4A8F]/10 text-[#5B4A8F] group-hover:bg-[#5B4A8F] group-hover:text-white transition-colors">
+                          <ResourceIcon size={24} />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className="font-lexend font-bold text-lg">{item.title}</h4>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] uppercase font-bold opacity-40 bg-black/5 px-2 py-0.5 rounded">
+                                {item.type === 'url' ? 'Link' : 'File'}
+                              </span>
+                            </div>
+                          </div>
+                          <p className="font-opendyslexic text-xs opacity-60 leading-relaxed">{item.description}</p>
+                          {item.type === 'file' && item.fileName && (
+                            <p className="text-[10px] opacity-40 font-mono">{item.fileName}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => handleDeleteLibraryItem(item.id)}
+                      className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-all"
+                      title="Delete resource"
+                    >
+                      <Trash2 size={16} className="text-red-500" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Add Button (shown when no custom items) */}
+        {customLibraryItems.length === 0 && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="font-lexend font-bold text-2xl">My Resources</h2>
+                <p className="font-opendyslexic text-sm opacity-60">Add your personal resources</p>
+              </div>
+              <button
+                onClick={async () => {
+                  await triggerHaptic('light');
+                  setShowAddLibraryModal(true);
+                }}
+                className="w-12 h-12 rounded-full bg-[#5B4A8F] text-white flex items-center justify-center shadow-lg active:scale-95 transition-all"
+                title="Add resource"
+              >
+                <span className="text-2xl font-bold">+</span>
+              </button>
+            </div>
+            <div className={`p-8 rounded-2xl border-2 border-dashed ${cardClass} border-opacity-30 text-center space-y-3`}>
+              <p className="font-opendyslexic text-sm opacity-60">No custom resources yet. Tap + to add your own guides, links, or files.</p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
-          <div className="text-center space-y-2">
+          <div className="text-center space-y-2 border-t pt-8">
             <h2 className="font-lexend font-bold text-2xl">Social Playbook</h2>
             <p className="font-opendyslexic text-sm opacity-60">Rules discovered during your decoding sessions.</p>
           </div>
@@ -415,12 +656,13 @@ const App: React.FC = () => {
             {LIBRARY_RESOURCES.map((res, i) => {
               const ResourceIcon = res.icon === 'Brain' ? Brain : res.icon === 'Briefcase' ? Briefcase : res.icon === 'Book' ? Book : MessageCircle;
               return (
-                <a 
-                  key={i} 
-                  href={res.link} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className={`p-6 rounded-2xl border-2 block ${cardClass} border-transparent hover:border-[#5B4A8F] transition-all group`}
+                <button
+                  key={i}
+                  onClick={async () => {
+                    await triggerHaptic('light');
+                    await openUrl(res.link);
+                  }}
+                  className={`p-6 rounded-2xl border-2 block w-full text-left ${cardClass} border-transparent hover:border-[#5B4A8F] transition-all group`}
                 >
                   <div className="flex items-start gap-4">
                     <div className="p-3 rounded-xl bg-[#5B4A8F]/10 text-[#5B4A8F] group-hover:bg-[#5B4A8F] group-hover:text-white transition-colors">
@@ -434,7 +676,7 @@ const App: React.FC = () => {
                       <p className="font-opendyslexic text-xs opacity-60 leading-relaxed">{res.description}</p>
                     </div>
                   </div>
-                </a>
+                </button>
               );
             })}
           </div>
@@ -470,15 +712,20 @@ const App: React.FC = () => {
         </div>
         <div className={`p-4 border-t ${headerClass}`}>
           <div className={`relative flex items-center gap-2 rounded-2xl border-2 p-2 ${cardClass}`}>
-            <input 
+            <input
               value={coachInput}
               onChange={(e) => setCoachInput(e.target.value)}
               placeholder="How do I say no nicely?"
               className="flex-1 bg-transparent outline-none px-4 py-2 font-opendyslexic"
-              onKeyPress={(e) => e.key === 'Enter' && handleCoachSubmit()}
+              onKeyPress={(e) => e.key === 'Enter' && !isCoachLoading && handleCoachSubmit()}
+              disabled={isCoachLoading}
             />
-            <button onClick={handleCoachSubmit} className="bg-[#5B4A8F] text-white p-3 rounded-xl active:scale-90 transition-all">
-              <ChevronRight size={20} />
+            <button
+              onClick={handleCoachSubmit}
+              disabled={isCoachLoading || !coachInput.trim()}
+              className="bg-[#5B4A8F] text-white p-3 rounded-xl active:scale-90 transition-all disabled:opacity-50 disabled:scale-100"
+            >
+              {isCoachLoading ? <Loader2 size={20} className="animate-spin" /> : <ChevronRight size={20} />}
             </button>
           </div>
         </div>
@@ -539,15 +786,24 @@ const App: React.FC = () => {
         <div className="space-y-2">
           <label className="font-lexend font-bold text-sm uppercase opacity-60">Message to decode</label>
           <div className={`relative rounded-2xl border-2 p-4 ${cardClass}`}>
-            <textarea 
+            <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               placeholder={selectedMode ? MODE_EXAMPLES[selectedMode] : "Paste message here..."}
               className="w-full h-32 bg-transparent outline-none font-opendyslexic resize-none"
             />
             <div className="flex justify-end gap-2 mt-2">
-              <button onClick={() => fileInputRef.current?.click()} className="p-2 opacity-60 hover:opacity-100 transition-opacity"><ImageIcon size={20} /></button>
-              <button onClick={() => cameraInputRef.current?.click()} className="p-2 opacity-60 hover:opacity-100 transition-opacity"><Camera size={20} /></button>
+              {isNativePlatform() ? (
+                <>
+                  <button onClick={handlePickImage} className="p-2 opacity-60 hover:opacity-100 transition-opacity" title="Choose from gallery"><ImageIcon size={20} /></button>
+                  <button onClick={handleTakePhoto} className="p-2 opacity-60 hover:opacity-100 transition-opacity" title="Take photo"><Camera size={20} /></button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => fileInputRef.current?.click()} className="p-2 opacity-60 hover:opacity-100 transition-opacity"><ImageIcon size={20} /></button>
+                  <button onClick={() => cameraInputRef.current?.click()} className="p-2 opacity-60 hover:opacity-100 transition-opacity"><Camera size={20} /></button>
+                </>
+              )}
             </div>
           </div>
           <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
@@ -556,8 +812,13 @@ const App: React.FC = () => {
 
         {selectedImage && (
           <div className="relative inline-block">
-            <img src={`data:${selectedImage.mimeType};base64,${selectedImage.data}`} className="h-20 w-20 object-cover rounded-xl" alt="Preview" />
-            <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"><X size={12} /></button>
+            <img
+              src={`data:${selectedImage.mimeType};base64,${selectedImage.data}`}
+              className="h-32 w-32 object-cover rounded-xl cursor-pointer shadow-md"
+              alt="Preview"
+              onClick={() => setImagePreviewUrl(`data:${selectedImage.mimeType};base64,${selectedImage.data}`)}
+            />
+            <button onClick={async () => { await triggerHaptic('light'); setSelectedImage(null); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg"><X size={16} /></button>
           </div>
         )}
 
@@ -581,12 +842,21 @@ const App: React.FC = () => {
           )}
         </div>
 
-        <button 
+        <button
           onClick={handleStartAnalysis}
-          disabled={!inputText.trim() && !selectedImage && !selectedAudio}
-          className={`w-full h-16 rounded-full font-lexend font-bold text-xl flex items-center justify-center gap-2 transition-all ${(!inputText.trim() && !selectedImage && !selectedAudio) ? 'bg-slate-200 text-slate-400' : 'bg-[#5B4A8F] text-white shadow-lg'}`}
+          disabled={(!inputText.trim() && !selectedImage && !selectedAudio) || isAnalyzing}
+          className={`w-full h-16 rounded-full font-lexend font-bold text-xl flex items-center justify-center gap-2 transition-all ${(!inputText.trim() && !selectedImage && !selectedAudio) || isAnalyzing ? 'bg-slate-200 text-slate-400' : 'bg-[#5B4A8F] text-white shadow-lg active:scale-95'}`}
         >
-          Decode This <Zap size={20} />
+          {isAnalyzing ? (
+            <>
+              <Loader2 className="animate-spin" size={20} />
+              Analyzing...
+            </>
+          ) : (
+            <>
+              Decode This <Zap size={20} />
+            </>
+          )}
         </button>
       </main>
     </div>
@@ -746,9 +1016,15 @@ const App: React.FC = () => {
                         ))}
                       </div>
                     </div>
-                    <div className="p-4 bg-black/5 rounded-2xl relative group">
-                      <p className="font-opendyslexic text-sm">{resp.wording}</p>
-                      <button onClick={() => { navigator.clipboard.writeText(resp.wording); alert("Copied!"); }} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><Copy size={16} /></button>
+                    <div className="p-4 bg-black/5 rounded-2xl relative">
+                      <p className="font-opendyslexic text-sm pr-8">{resp.wording}</p>
+                      <button
+                        onClick={() => handleCopyResponse(resp.wording)}
+                        className="absolute top-2 right-2 p-2 rounded-lg bg-white/80 hover:bg-white shadow-sm active:scale-95 transition-all"
+                        title="Copy response"
+                      >
+                        <Copy size={16} />
+                      </button>
                     </div>
                     <div className="space-y-1">
                       <p className="font-lexend font-bold text-[10px] uppercase opacity-40">Social Impact</p>
@@ -940,7 +1216,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className={`max-w-md mx-auto min-h-screen overflow-hidden transition-all duration-300 select-none relative ${themeClass} app-font-${settings.fontFamily}`}>
+    <div className={`max-w-md mx-auto min-h-screen overflow-hidden transition-all duration-300 select-none relative ${themeClass} app-font-${settings.fontFamily} text-size-${settings.textSize}`}>
       {screen === 'WELCOME' && renderWelcome()}
       {screen === 'HOME' && renderHome()}
       {screen === 'LIBRARY' && renderLibrary()}
@@ -952,6 +1228,43 @@ const App: React.FC = () => {
       {screen === 'LOADING' && renderLoading()}
       {screen === 'RESULTS' && renderResults()}
       {screen === 'PAYWALL' && <Paywall onClose={() => setScreen('HOME')} onSubscribe={() => {}} darkMode={settings.darkMode} />}
+
+      {/* Toast Notification */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+          darkMode={settings.darkMode}
+        />
+      )}
+
+      {/* Image Preview Modal */}
+      {imagePreviewUrl && (
+        <div
+          className="fixed inset-0 z-[400] bg-black/90 flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setImagePreviewUrl(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img src={imagePreviewUrl} alt="Full preview" className="max-w-full max-h-[90vh] object-contain rounded-xl" />
+            <button
+              onClick={() => setImagePreviewUrl(null)}
+              className="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white p-3 rounded-full hover:bg-white/30 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Library Item Modal */}
+      {showAddLibraryModal && (
+        <AddLibraryItemModal
+          onClose={() => setShowAddLibraryModal(false)}
+          onAdd={handleAddLibraryItem}
+          darkMode={settings.darkMode}
+        />
+      )}
     </div>
   );
 };

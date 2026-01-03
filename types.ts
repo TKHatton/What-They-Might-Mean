@@ -70,3 +70,16 @@ export interface UserSettings {
   analysesCount: number;
   subscriptionExpiry?: number;
 }
+
+export interface CustomLibraryItem {
+  id: string;
+  title: string;
+  description: string;
+  type: 'url' | 'file';
+  url?: string;
+  fileData?: string; // base64 for uploaded files
+  fileName?: string;
+  mimeType?: string;
+  icon: 'Brain' | 'Briefcase' | 'Book' | 'MessageCircle';
+  createdAt: number;
+}

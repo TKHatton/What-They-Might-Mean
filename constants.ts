@@ -61,28 +61,52 @@ We provide WTM "as is" and are not liable for social, professional, or personal 
 
 export const LIBRARY_RESOURCES = [
   {
-    title: "Double Empathy Problem",
-    description: "Learn why communication gaps happen between neurodivergent and neurotypical people.",
-    link: "https://en.wikipedia.org/wiki/Double_empathy_problem",
+    title: "Understanding Indirect Communication",
+    description: "Why people don't always say what they mean and how to decode subtext in messages.",
+    link: "https://en.wikipedia.org/wiki/Indirect_speech",
     icon: "Brain"
   },
   {
-    title: "Social Thinking Guide",
-    description: "Strategies for interpreting social nuances in the workplace.",
-    link: "https://www.socialthinking.com/",
+    title: "Workplace Communication Styles",
+    description: "Professional email etiquette, feedback language, and office politics decoded.",
+    link: "https://www.themuse.com/advice/communication-styles-at-work",
     icon: "Briefcase"
   },
   {
-    title: "The Hidden Curriculum",
-    description: "Understanding unspoken rules in school and social settings.",
-    link: "https://www.autism.org.uk/",
+    title: "Social Scripts & Responses",
+    description: "Common social situations with example responses for different contexts and relationships.",
+    link: "https://www.understood.org/en/articles/social-skills-helping-your-child-understand-social-cues",
+    icon: "MessageCircle"
+  },
+  {
+    title: "Tone Indicators Guide",
+    description: "Understanding tone in text: sarcasm, sincerity, urgency markers, and digital communication.",
+    link: "https://toneindicators.carrd.co/",
     icon: "Book"
   },
   {
-    title: "Communication Accommodation",
-    description: "How to advocate for clearer communication needs.",
-    link: "https://askjan.org/",
+    title: "Double Empathy Problem",
+    description: "Research on communication gaps between neurodivergent and neurotypical people.",
+    link: "https://www.frontiersin.org/articles/10.3389/fpsyg.2022.882177/full",
+    icon: "Brain"
+  },
+  {
+    title: "Autism & Communication",
+    description: "Comprehensive guide to autistic communication styles and needs.",
+    link: "https://www.autism.org.uk/advice-and-guidance/topics/communication",
     icon: "MessageCircle"
+  },
+  {
+    title: "ADHD Social Skills",
+    description: "How ADHD affects social interactions and strategies for improvement.",
+    link: "https://chadd.org/for-adults/social-skills/",
+    icon: "Brain"
+  },
+  {
+    title: "Nonverbal Communication Guide",
+    description: "Body language, facial expressions, and unspoken social cues explained.",
+    link: "https://www.verywellmind.com/types-of-nonverbal-communication-2795397",
+    icon: "Book"
   }
 ];
 
