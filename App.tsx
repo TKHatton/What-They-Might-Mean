@@ -10,7 +10,7 @@ import {
   QueuedAnalysis,
   CustomLibraryItem
 } from './types';
-import { COLORS, FREE_TIER_LIMIT, STRIPE_CONFIG, SUBSCRIPTION_PRODUCTS, PRIVACY_POLICY, TERMS_OF_SERVICE, LIBRARY_RESOURCES } from './constants';
+import { COLORS, FREE_TIER_LIMIT, STRIPE_CONFIG, SUBSCRIPTION_PRODUCTS, PRIVACY_POLICY, TERMS_OF_SERVICE, LIBRARY_RESOURCES, COACH_EXAMPLES } from './constants';
 import RiskMeter from './components/RiskMeter';
 import Paywall from './components/Paywall';
 import PaymentSheet from './components/PaymentSheet';
@@ -130,7 +130,7 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<UserSettings>({
     textSize: 'Medium',
     fontFamily: 'Lexend',
-    voiceName: 'Zephyr',
+    voiceName: '',
     analysisDetail: DetailLevel.STANDARD,
     audioOutput: false,
     audioSpeed: 1,
@@ -139,6 +139,7 @@ const App: React.FC = () => {
     tier: UserTier.FREE,
     analysesCount: 0
   });
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Derived: Library of rules
   const allDiscoveredRules = useMemo(() => {
@@ -173,6 +174,28 @@ const App: React.FC = () => {
 
     const savedCustomLibrary = localStorage.getItem('wtm_custom_library');
     if (savedCustomLibrary) setCustomLibraryItems(JSON.parse(savedCustomLibrary));
+
+    // Load available voices for TTS
+    const loadVoices = () => {
+      const voices = ttsService.getVoices();
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+        // Set default voice if none selected
+        if (!savedSettings || !JSON.parse(savedSettings || '{}').voiceName) {
+          // Prefer English voices
+          const englishVoice = voices.find(v => v.lang.startsWith('en')) || voices[0];
+          if (englishVoice) {
+            setSettings(prev => ({ ...prev, voiceName: englishVoice.name }));
+          }
+        }
+      }
+    };
+
+    // Voices might not be loaded immediately
+    loadVoices();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
   }, []);
 
   useEffect(() => {
@@ -240,7 +263,7 @@ const App: React.FC = () => {
     if (!settings.audioOutput || !ttsService.isAvailable()) return;
 
     const textToSpeak = `The message clarity score is ${analysis.clarityScore.score} out of 5. ${analysis.clarityScore.explanation}. Translation: ${analysis.whatWasSaid}`;
-    ttsService.speak(textToSpeak, { rate: settings.audioSpeed });
+    ttsService.speak(textToSpeak, { rate: settings.audioSpeed, voice: settings.voiceName });
   };
 
   // Handlers
@@ -345,7 +368,7 @@ const App: React.FC = () => {
 
       // Speak coach response if audio is enabled
       if (settings.audioOutput && ttsService.isAvailable()) {
-        ttsService.speak(response, { rate: settings.audioSpeed });
+        ttsService.speak(response, { rate: settings.audioSpeed, voice: settings.voiceName });
       }
     } catch (error) {
       console.error('Coach error:', error);
@@ -686,53 +709,157 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderCoach = () => (
-    <div className={`min-h-screen flex flex-col screen-enter ${themeClass}`}>
-      {renderHeader("Coach")}
-      <main className="flex-1 flex flex-col overflow-hidden pb-20">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
-          {coachHistory.length === 0 && (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 px-8">
-              <div className="w-20 h-20 rounded-full bg-[#5B4A8F]/10 flex items-center justify-center text-[#5B4A8F]">
-                <BrainCircuit size={40} />
+  const renderCoach = () => {
+    const currentExamples = COACH_EXAMPLES[settings.defaultMode] || COACH_EXAMPLES.WORK;
+
+    const handleExampleClick = async (promptText: string) => {
+      setCoachInput(promptText);
+      await triggerHaptic('light');
+
+      // Auto-send the example prompt
+      const userMsg = promptText;
+      setCoachInput('');
+      setCoachHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+      setIsCoachLoading(true);
+
+      try {
+        const response = await sendCoachMessage(userMsg, coachHistory);
+        setCoachHistory(prev => [...prev, { role: 'bot', text: response }]);
+
+        if (settings.audioOutput && ttsService.isAvailable()) {
+          ttsService.speak(response, { rate: settings.audioSpeed, voice: settings.voiceName });
+        }
+      } catch (error) {
+        showToast('Could not reach coach. Please try again.', 'error');
+      } finally {
+        setIsCoachLoading(false);
+      }
+    };
+
+    return (
+      <div className={`min-h-screen flex flex-col screen-enter ${themeClass}`}>
+        {/* Header with Clear Button */}
+        <header className={`flex justify-between items-center p-6 pb-4 ${headerClass}`}>
+          <button onClick={() => setScreen('HOME')} className="opacity-40 hover:opacity-100 transition-opacity">
+            <ChevronLeft size={28} />
+          </button>
+          <h2 className="font-lexend font-bold text-xl">🧠 Coach</h2>
+          <button
+            onClick={async () => {
+              await triggerHaptic('medium');
+              setCoachHistory([]);
+              setCoachInput('');
+              showToast('Chat cleared', 'info');
+            }}
+            className="opacity-40 hover:opacity-100 transition-opacity"
+          >
+            <Trash2 size={20} />
+          </button>
+        </header>
+
+        <main className="flex-1 flex flex-col overflow-hidden pb-20">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 no-scrollbar">
+            {/* Welcome Card - Empty State */}
+            {coachHistory.length === 0 && (
+              <div className={`rounded-3xl p-8 space-y-4 ${cardClass} shadow-sm border-2 border-[#5B4A8F]/20`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#5B4A8F]/10 flex items-center justify-center">
+                    <BrainCircuit size={24} className="text-[#5B4A8F]" />
+                  </div>
+                  <h3 className="font-lexend font-bold text-xl">Your Social Skills Coach</h3>
+                </div>
+                <p className="text-sm opacity-70 leading-relaxed">
+                  I'm here to help you navigate social situations with confidence. Ask me about:
+                </p>
+                <ul className="text-sm opacity-70 space-y-2 pl-4">
+                  <li>• How to respond to messages</li>
+                  <li>• What someone might mean by something they said</li>
+                  <li>• How to handle awkward situations</li>
+                  <li>• Practice for upcoming conversations</li>
+                  <li>• Understanding social expectations</li>
+                </ul>
               </div>
-              <div className="space-y-2">
-                <h3 className="font-lexend font-bold text-xl">Social Prep Chat</h3>
-                <p className="font-opendyslexic text-sm opacity-60">Ask me anything about social cues, etiquette, or how to handle an upcoming interaction.</p>
+            )}
+
+            {/* Example Prompts */}
+            {coachHistory.length === 0 && (
+              <div className="space-y-3">
+                <h4 className="font-lexend font-bold text-sm uppercase opacity-60 px-2">
+                  📚 Try asking me:
+                </h4>
+                <div className="space-y-2">
+                  {currentExamples.map((example, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleExampleClick(example.prompt)}
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all active:scale-98 ${cardClass} border-transparent hover:border-[#5B4A8F]/30 shadow-sm`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl mt-0.5">{example.icon}</span>
+                        <div className="flex-1">
+                          <p className="font-lexend text-sm">{example.prompt}</p>
+                          <span className="text-[10px] opacity-40 uppercase tracking-wide">
+                            {example.category}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          {coachHistory.map((chat, i) => (
-            <div key={i} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-4 rounded-2xl font-opendyslexic text-sm ${chat.role === 'user' ? 'bg-[#5B4A8F] text-white rounded-br-none' : `${cardClass} rounded-bl-none`}`}>
-                {chat.text}
+            )}
+
+            {/* Chat History */}
+            {coachHistory.map((chat, i) => (
+              <div key={i} className={`flex ${chat.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom duration-300`}>
+                <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                  chat.role === 'user'
+                    ? 'bg-[#5B4A8F] text-white rounded-br-sm'
+                    : `${cardClass} rounded-bl-sm shadow-sm border-2 border-transparent`
+                }`}>
+                  {chat.text}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className={`p-4 border-t ${headerClass}`}>
-          <div className={`relative flex items-center gap-2 rounded-2xl border-2 p-2 ${cardClass}`}>
-            <input
-              value={coachInput}
-              onChange={(e) => setCoachInput(e.target.value)}
-              placeholder="How do I say no nicely?"
-              className="flex-1 bg-transparent outline-none px-4 py-2 font-opendyslexic"
-              onKeyPress={(e) => e.key === 'Enter' && !isCoachLoading && handleCoachSubmit()}
-              disabled={isCoachLoading}
-            />
-            <button
-              onClick={handleCoachSubmit}
-              disabled={isCoachLoading || !coachInput.trim()}
-              className="bg-[#5B4A8F] text-white p-3 rounded-xl active:scale-90 transition-all disabled:opacity-50 disabled:scale-100"
-            >
-              {isCoachLoading ? <Loader2 size={20} className="animate-spin" /> : <ChevronRight size={20} />}
-            </button>
+            ))}
+
+            {/* Loading Indicator */}
+            {isCoachLoading && (
+              <div className="flex justify-start animate-in slide-in-from-bottom duration-300">
+                <div className={`max-w-[85%] p-4 rounded-2xl rounded-bl-sm ${cardClass} shadow-sm`}>
+                  <div className="flex items-center gap-2 text-sm opacity-60">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Coach is thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      </main>
-      {renderBottomNav()}
-    </div>
-  );
+
+          {/* Input Area - Fixed Bottom */}
+          <div className={`p-4 border-t ${headerClass}`}>
+            <div className={`relative flex items-center gap-2 rounded-2xl border-2 p-2 ${cardClass}`}>
+              <input
+                value={coachInput}
+                onChange={(e) => setCoachInput(e.target.value)}
+                placeholder={coachHistory.length === 0 ? "Tap an example above, or ask me anything..." : "Ask a follow-up question..."}
+                className="flex-1 bg-transparent outline-none px-4 py-2"
+                onKeyPress={(e) => e.key === 'Enter' && !isCoachLoading && coachInput.trim() && handleCoachSubmit()}
+                disabled={isCoachLoading}
+              />
+              <button
+                onClick={handleCoachSubmit}
+                disabled={isCoachLoading || !coachInput.trim()}
+                className="bg-[#5B4A8F] text-white p-3 rounded-xl active:scale-90 transition-all disabled:opacity-50 disabled:scale-100"
+              >
+                {isCoachLoading ? <Loader2 size={20} className="animate-spin" /> : <ChevronRight size={20} />}
+              </button>
+            </div>
+          </div>
+        </main>
+        {renderBottomNav()}
+      </div>
+    );
+  };
 
   const renderWelcome = () => (
     <div className={`min-h-screen flex flex-col items-center justify-center p-8 text-center space-y-8 screen-enter ${themeClass}`}>
@@ -1150,18 +1277,46 @@ const App: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <p className="font-lexend font-bold text-sm">Voice</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'].map(voice => (
-                    <button 
-                      key={voice} 
-                      onClick={() => setSettings(s => ({ ...s, voiceName: voice as any }))} 
-                      className={`p-3 rounded-xl border-2 font-lexend text-xs transition-all ${getBtnStyle(settings.voiceName === voice)}`}
-                    >
-                      {voice}
-                    </button>
-                  ))}
+                <div className="flex justify-between items-center">
+                  <p className="font-lexend font-bold text-sm">Voice</p>
+                  <button
+                    onClick={async () => {
+                      await triggerHaptic('light');
+                      if (ttsService.isAvailable()) {
+                        const testText = "Hello! This is how I sound. I can help you understand what people really mean.";
+                        ttsService.speak(testText, { rate: settings.audioSpeed, voice: settings.voiceName });
+                        showToast('Playing voice sample', 'info');
+                      } else {
+                        showToast('Text-to-Speech not available', 'error');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-[#5B4A8F]/10 text-[#5B4A8F] text-xs font-bold hover:bg-[#5B4A8F]/20 transition-all active:scale-95"
+                  >
+                    Test Voice
+                  </button>
                 </div>
+                <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+                  {availableVoices.length === 0 ? (
+                    <div className="text-xs opacity-50 text-center py-4">
+                      Loading voices...
+                    </div>
+                  ) : (
+                    availableVoices.slice(0, 10).map(voice => (
+                      <button
+                        key={voice.name}
+                        onClick={async () => {
+                          await triggerHaptic('light');
+                          setSettings(s => ({ ...s, voiceName: voice.name }));
+                        }}
+                        className={`p-3 rounded-xl border-2 font-lexend text-xs transition-all text-left ${getBtnStyle(settings.voiceName === voice.name)}`}
+                      >
+                        <div className="font-bold">{voice.name}</div>
+                        <div className="text-[10px] opacity-60">{voice.lang}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <p className="text-[10px] opacity-50 italic">Note: Voice names are for reference. Actual voice depends on your device's available voices.</p>
               </div>
 
               <div className="space-y-3">

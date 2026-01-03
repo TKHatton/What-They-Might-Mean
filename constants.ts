@@ -110,6 +110,105 @@ export const LIBRARY_RESOURCES = [
   }
 ];
 
+export const COACH_EXAMPLES = {
+  WORK: [
+    {
+      prompt: "How do I ask my boss for time off?",
+      icon: "💼",
+      category: "Request"
+    },
+    {
+      prompt: "My coworker said 'we should grab coffee sometime' - do they mean it?",
+      icon: "💼",
+      category: "Interpretation"
+    },
+    {
+      prompt: "I got vague feedback at work. How do I ask for specifics?",
+      icon: "💼",
+      category: "Clarification"
+    },
+    {
+      prompt: "How do I decline extra work without seeming lazy?",
+      icon: "💼",
+      category: "Boundaries"
+    },
+    {
+      prompt: "My manager said 'no rush' on a task. When is it due?",
+      icon: "💼",
+      category: "Hidden Meaning"
+    },
+    {
+      prompt: "How do I tell a client their idea won't work?",
+      icon: "💼",
+      category: "Difficult Conversation"
+    }
+  ],
+  SCHOOL: [
+    {
+      prompt: "How do I ask my teacher to explain something again?",
+      icon: "🎓",
+      category: "Clarification"
+    },
+    {
+      prompt: "My group partner isn't doing their part. What do I say?",
+      icon: "🎓",
+      category: "Conflict"
+    },
+    {
+      prompt: "Someone asked to copy my homework. How do I say no?",
+      icon: "🎓",
+      category: "Boundaries"
+    },
+    {
+      prompt: "The other students are talking about plans and didn't invite me. Should I ask?",
+      icon: "🎓",
+      category: "Social Anxiety"
+    },
+    {
+      prompt: "My professor said 'see me after class' - am I in trouble?",
+      icon: "🎓",
+      category: "Interpretation"
+    },
+    {
+      prompt: "How do I introduce myself in a new class?",
+      icon: "🎓",
+      category: "Social Skills"
+    }
+  ],
+  SOCIAL: [
+    {
+      prompt: "My friend is upset with me but won't say why. What do I do?",
+      icon: "👥",
+      category: "Conflict Resolution"
+    },
+    {
+      prompt: "How do I politely decline an invitation?",
+      icon: "👥",
+      category: "Boundaries"
+    },
+    {
+      prompt: "Someone texted 'K' - are they mad at me?",
+      icon: "👥",
+      category: "Text Interpretation"
+    },
+    {
+      prompt: "My friend group made plans without me. Should I say something?",
+      icon: "👥",
+      category: "Social Anxiety"
+    },
+    {
+      prompt: "How do I tell someone I need space without hurting their feelings?",
+      icon: "👥",
+      category: "Boundaries"
+    },
+    {
+      prompt: "What's the difference between 'let's hang out' and actual plans?",
+      icon: "👥",
+      category: "Hidden Meaning"
+    }
+  ]
+};
+
 export const SYSTEM_INSTRUCTION = `
 You are the "Expectation Translator," a clarity and autonomy tool for neurodivergent individuals.
 

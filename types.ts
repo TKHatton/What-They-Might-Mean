@@ -60,7 +60,7 @@ export type Screen = 'WELCOME' | 'ONBOARDING' | 'HOME' | 'INPUT' | 'LOADING' | '
 export interface UserSettings {
   textSize: 'Small' | 'Medium' | 'Large' | 'ExtraLarge';
   fontFamily: 'Lexend' | 'OpenDyslexic' | 'Comic' | 'Sans';
-  voiceName: 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
+  voiceName: string; // System voice name from Web Speech API
   analysisDetail: DetailLevel;
   audioOutput: boolean;
   audioSpeed: number;

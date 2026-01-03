@@ -10,13 +10,13 @@
     <style>
       @font-face {
         font-family: 'OpenDyslexic';
-        src: url('https://cdn.jsdelivr.net/npm/opendyslexic@1.0.3/OpenDyslexic-Regular.otf') format('opentype');
+        src: url('https://cdn.jsdelivr.net/gh/antijingoist/opendyslexic@master/otf/OpenDyslexic-Regular.otf') format('opentype');
         font-weight: normal;
         font-style: normal;
       }
       @font-face {
         font-family: 'OpenDyslexic';
-        src: url('https://cdn.jsdelivr.net/npm/opendyslexic@1.0.3/OpenDyslexic-Bold.otf') format('opentype');
+        src: url('https://cdn.jsdelivr.net/gh/antijingoist/opendyslexic@master/otf/OpenDyslexic-Bold.otf') format('opentype');
         font-weight: bold;
         font-style: normal;
       }
@@ -36,21 +36,40 @@
       .font-comic { font-family: 'Comic Neue', cursive, sans-serif; }
       .font-sans-alt { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 
-      /* Global Class overrides for font selection */
-      .app-font-Lexend { font-family: 'Lexend', sans-serif; }
-      .app-font-Lexend * { font-family: 'Lexend', sans-serif; }
-      .app-font-OpenDyslexic { font-family: 'OpenDyslexic', sans-serif; }
-      .app-font-OpenDyslexic * { font-family: 'OpenDyslexic', sans-serif; }
-      .app-font-Comic { font-family: 'Comic Neue', cursive, sans-serif; }
-      .app-font-Comic * { font-family: 'Comic Neue', cursive, sans-serif; }
-      .app-font-Sans { font-family: ui-sans-serif, system-ui, sans-serif; }
-      .app-font-Sans * { font-family: ui-sans-serif, system-ui, sans-serif; }
+      /* Global Class overrides for font selection - using !important to override component-level fonts */
+      .app-font-Lexend, .app-font-Lexend * {
+        font-family: 'Lexend', sans-serif !important;
+      }
+      .app-font-OpenDyslexic, .app-font-OpenDyslexic * {
+        font-family: 'OpenDyslexic', sans-serif !important;
+      }
+      .app-font-Comic, .app-font-Comic * {
+        font-family: 'Comic Neue', cursive, sans-serif !important;
+      }
+      .app-font-Sans, .app-font-Sans * {
+        font-family: ui-sans-serif, system-ui, sans-serif !important;
+      }
 
-      /* Text size scaling */
-      .text-size-Small { font-size: 14px; }
+      /* Text size scaling - more dramatic differences */
+      .text-size-Small { font-size: 13px; }
+      .text-size-Small h1 { font-size: 1.5rem !important; }
+      .text-size-Small h2 { font-size: 1.3rem !important; }
+      .text-size-Small h3 { font-size: 1.1rem !important; }
+
       .text-size-Medium { font-size: 16px; }
-      .text-size-Large { font-size: 18px; }
-      .text-size-ExtraLarge { font-size: 20px; }
+      .text-size-Medium h1 { font-size: 2rem !important; }
+      .text-size-Medium h2 { font-size: 1.5rem !important; }
+      .text-size-Medium h3 { font-size: 1.25rem !important; }
+
+      .text-size-Large { font-size: 19px; }
+      .text-size-Large h1 { font-size: 2.5rem !important; }
+      .text-size-Large h2 { font-size: 2rem !important; }
+      .text-size-Large h3 { font-size: 1.5rem !important; }
+
+      .text-size-ExtraLarge { font-size: 22px; }
+      .text-size-ExtraLarge h1 { font-size: 3rem !important; }
+      .text-size-ExtraLarge h2 { font-size: 2.5rem !important; }
+      .text-size-ExtraLarge h3 { font-size: 2rem !important; }
 
       /* Transitions */
       .screen-enter {
