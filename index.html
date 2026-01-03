@@ -94,6 +94,18 @@
         transform-origin: bottom center;
       }
 
+      /* Make white background transparent */
+      .owlbert-transparent {
+        mix-blend-mode: multiply;
+        background-color: transparent;
+      }
+
+      /* For dark mode, use screen blend mode instead */
+      .dark .owlbert-transparent {
+        mix-blend-mode: screen;
+        filter: invert(1);
+      }
+
       @keyframes wave {
         0%, 100% {
           transform: rotate(0deg);

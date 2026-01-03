@@ -486,9 +486,9 @@ const App: React.FC = () => {
   const AppIcon = ({ size = 64 }) => (
     <div className="relative flex items-center justify-center owlbert-container" style={{ width: size, height: size }}>
       <img
-        src="./assets/images/Logo for WTM.png"
+        src="./assets/images/Owlbert_Waving.svg"
         alt="What They Meant Logo"
-        className="w-full h-full object-contain drop-shadow-2xl owlbert-waving"
+        className="w-full h-full object-contain drop-shadow-2xl owlbert-waving owlbert-transparent"
       />
     </div>
   );
