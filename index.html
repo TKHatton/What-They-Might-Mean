@@ -87,6 +87,37 @@
       .card-shadow {
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
       }
+
+      /* Owlbert Animations */
+      .owlbert-waving {
+        animation: wave 2.5s ease-in-out infinite, blink 4s step-end infinite;
+        transform-origin: bottom center;
+      }
+
+      @keyframes wave {
+        0%, 100% {
+          transform: rotate(0deg);
+        }
+        25% {
+          transform: rotate(-8deg);
+        }
+        75% {
+          transform: rotate(8deg);
+        }
+      }
+
+      @keyframes blink {
+        0%, 48%, 52%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .owlbert-container {
+        perspective: 1000px;
+      }
     </style>
   <script type="importmap">
 {
