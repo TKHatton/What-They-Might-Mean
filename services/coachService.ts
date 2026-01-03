@@ -50,7 +50,7 @@ export const sendCoachMessage = async (
   conversationHistory: { role: 'user' | 'bot', text: string }[]
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_GEMINI_API_KEY });
 
     // Build conversation context
     const context = conversationHistory

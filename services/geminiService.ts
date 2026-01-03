@@ -11,7 +11,7 @@ export const analyzeMessage = async (
   audio?: { data: string; mimeType: string }
 ): Promise<AnalysisResult> => {
   // Always use a named parameter and obtain the API key exclusively from the environment variable.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GOOGLE_GEMINI_API_KEY });
   
   const prompt = `
     Analyze this message in the context of ${mode}.

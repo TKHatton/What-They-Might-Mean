@@ -241,12 +241,12 @@ Copy this template and fill in your real keys:
 
 # Supabase Configuration
 # Get from: https://app.supabase.com/project/_/settings/api
-VITE_SUPABASE_URL=https://xxxxxxxxxxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdnZxZnV5c3B4aGZ5Y3R2amd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk1MjE4MzUsImV4cCI6MjAyNTA5NzgzNX0.xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key-here
 
 # Google Gemini API
 # Get from: https://aistudio.google.com/app/apikey
-VITE_GOOGLE_GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+VITE_GOOGLE_GEMINI_API_KEY=your-google-gemini-api-key-here
 ```
 
 **Remember:** Replace the example values with your actual keys!

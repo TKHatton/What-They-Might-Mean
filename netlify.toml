@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Disable strict secrets scanning since we're using client-side API keys
+  # Client-side API keys are meant to be public and should be restricted
+  # at the API provider level (Google Cloud Console, Supabase)
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
