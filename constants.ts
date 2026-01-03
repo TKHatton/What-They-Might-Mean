@@ -1,0 +1,132 @@
+
+export const COLORS = {
+  PRIMARY_PURPLE: '#5B4A8F',
+  SAGE_GREEN: '#8FAD9C',
+  ACCENT_COLOR: '#D4A5A5', 
+  LIGHT_PURPLE: '#C4B5D9',
+  WHITE: '#FFFFFF',
+  BLACK: '#000000',
+  DARK_PURPLE: '#4A3A7A',
+};
+
+export const STRIPE_CONFIG = {
+  PUBLISHABLE_KEY: 'pk_test_wtm_simulated_key',
+  MODE: 'test',
+};
+
+export const SUBSCRIPTION_PRODUCTS = {
+  PLUS_MONTHLY: { id: 'com.wtm.plus.monthly', price: '$4.99', period: 'month', label: 'Plus Monthly' },
+  PLUS_YEARLY: { id: 'com.wtm.plus.yearly', price: '$49.99', period: 'year', label: 'Plus Yearly', savings: '17%' },
+  PRO_MONTHLY: { id: 'com.wtm.pro.monthly', price: '$12.99', period: 'month', label: 'Pro Monthly' },
+  PRO_YEARLY: { id: 'com.wtm.pro.yearly', price: '$129.99', period: 'year', label: 'Pro Yearly', savings: '17%' },
+};
+
+export const FREE_TIER_LIMIT = 5;
+
+export const PRIVACY_POLICY = `
+# Privacy Policy
+Last Updated: October 2023
+
+## 1. Data Collection
+What They Meant (WTM) is designed with privacy in mind. We do not sell your data.
+- **Local Storage**: Your analysis history is stored locally on your device.
+- **AI Processing**: When you submit a message, image, or audio for analysis, it is processed via Google Gemini API. Please do not submit highly sensitive personal identification.
+- **Usage Data**: We collect minimal, anonymized usage data to improve the app.
+
+## 2. Third-Party Services
+- **Google Cloud**: Used for AI decoding.
+- **Stripe**: Handles payment processing. We do not store your credit card details.
+
+## 3. Your Rights
+You can clear your history and data at any time via the Settings menu.
+`;
+
+export const TERMS_OF_SERVICE = `
+# Terms of Service
+Last Updated: October 2023
+
+## 1. Acceptance of Terms
+By using WTM, you agree to these terms.
+
+## 2. No Medical Advice
+WTM is a social communication aid. It is NOT a substitute for professional mental health, medical, or legal advice. Decisions made based on WTM output are your own responsibility.
+
+## 3. Subscriptions
+- Payments are handled through your respective App Store (Apple/Google).
+- Subscriptions auto-renew unless canceled 24 hours before the period ends.
+
+## 4. Limitation of Liability
+We provide WTM "as is" and are not liable for social, professional, or personal outcomes resulting from the use of our communication translations.
+`;
+
+export const LIBRARY_RESOURCES = [
+  {
+    title: "Double Empathy Problem",
+    description: "Learn why communication gaps happen between neurodivergent and neurotypical people.",
+    link: "https://en.wikipedia.org/wiki/Double_empathy_problem",
+    icon: "Brain"
+  },
+  {
+    title: "Social Thinking Guide",
+    description: "Strategies for interpreting social nuances in the workplace.",
+    link: "https://www.socialthinking.com/",
+    icon: "Briefcase"
+  },
+  {
+    title: "The Hidden Curriculum",
+    description: "Understanding unspoken rules in school and social settings.",
+    link: "https://www.autism.org.uk/",
+    icon: "Book"
+  },
+  {
+    title: "Communication Accommodation",
+    description: "How to advocate for clearer communication needs.",
+    link: "https://askjan.org/",
+    icon: "MessageCircle"
+  }
+];
+
+export const SYSTEM_INSTRUCTION = `
+You are the "Expectation Translator," a clarity and autonomy tool for neurodivergent individuals.
+
+GOAL: Break down confusing messages into literal meanings, hidden expectations, risks, and social rules.
+
+TERMINOLOGY GUIDELINES (STRICT ENFORCEMENT):
+- SCHOOL Mode: Use "Assignment", "Rubric", "Task", "Instructor". NEVER use "Prompt" unless referring to a literal essay prompt.
+- WORK Mode: Use "Request", "SOP", "Deadline", "Objective". 
+- SOCIAL Mode: Use "Invitation", "Text", "Vibe", "Dynamic".
+
+CLARITY SCORING (1-5 SCALE):
+You must use the full range of the scale. Avoid always picking "3" (Medium).
+- 1 (Crystal Clear): Rare. Only for explicit lists or direct "Yes/No" answers.
+- 2 (Mostly Clear): For standard requests with slight politeness padding. (FAVOR THIS over 3).
+- 3 (Moderate): For messages where literal words and intent match but timing or priority is vague.
+- 4 (High Ambiguity): For "Corporate speak", passive-aggression, or heavily coded social hints. (FAVOR THIS over 3).
+- 5 (Very Confusing): For total contradictions, complete silence/ghosting, or "Read between the lines" demands where failure is likely without help.
+
+OUTPUT STRUCTURE (JSON format strictly):
+{
+  "whatWasSaid": "A brief literal summary.",
+  "whatIsExpected": ["Concrete actions the sender likely expects."],
+  "whatIsOptional": ["Things mentioned that aren't strictly required."],
+  "whatCarriesRisk": ["Potential negative outcomes if specific actions aren't taken."],
+  "whatIsNotAskingFor": ["Obligations the recipient might imagine but aren't there."],
+  "hiddenRules": ["Social etiquette or professional norms involved."],
+  "clarityScore": {
+    "score": 1-5,
+    "explanation": "Why this specific score was chosen."
+  },
+  "confidenceLevel": "High", "Medium", or "Low",
+  "responses": [
+    {
+      "type": "Direct / Formal / Casual",
+      "wording": "A proposed response text.",
+      "toneDescription": "Tone profile.",
+      "socialImpact": "What this response signals. (e.g., 'Confirms you are prioritizing the assignment'). AVOID the word 'prompt'.",
+      "riskLevel": 1-5
+    }
+  ]
+}
+
+Always maintain a helpful, encouraging, and patient tone.
+`;

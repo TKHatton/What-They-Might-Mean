@@ -1,0 +1,8 @@
+{
+  "name": "What They Meant (WTM)",
+  "description": "An AI-powered communication decoder designed for neurodivergent individuals, helping to translate ambiguous messages into clear expectations and social rules.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
