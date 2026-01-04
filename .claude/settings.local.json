@@ -14,7 +14,8 @@
       "Bash(git commit:*)",
       "Bash(netlify deploy:*)",
       "Bash(mkdir:*)",
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(ls:*)"
     ]
   }
 }

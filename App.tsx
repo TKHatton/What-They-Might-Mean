@@ -16,6 +16,7 @@ import Paywall from './components/Paywall';
 import PaymentSheet from './components/PaymentSheet';
 import Toast, { ToastType } from './components/Toast';
 import AddLibraryItemModal from './components/AddLibraryItemModal';
+import HeaderOwlBert from './components/HeaderOwlBert';
 import { analyzeMessage } from './services/geminiService';
 import { sendCoachMessage } from './services/coachService';
 import { ttsService } from './services/ttsService';
@@ -514,7 +515,7 @@ const App: React.FC = () => {
 
   const renderHeader = (title: string, showBack = true) => (
     <header className={`p-6 flex items-center gap-4 border-b shrink-0 ${headerClass}`}>
-      {showBack ? <button onClick={() => setScreen('HOME')}><ChevronLeft size={32} /></button> : <div className="flex items-center gap-2"><AppIcon size={32} /></div>}
+      {showBack ? <button onClick={() => setScreen('HOME')}><ChevronLeft size={32} /></button> : <div className="flex items-center gap-2"><HeaderOwlBert selectedOption={selectedMode as any} /></div>}
       <div className="flex-1 text-center">
         <h1 className="font-lexend font-bold text-xl uppercase tracking-widest">{title}</h1>
         {!isOnline && <div className="text-[10px] text-red-500 font-bold uppercase tracking-widest">Offline</div>}
