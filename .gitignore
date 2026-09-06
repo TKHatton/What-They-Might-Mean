@@ -39,3 +39,7 @@ ios/App/Pods
 ios/App/App.xcworkspace/xcuserdata
 ios/App/App.xcworkspace/xcshareddata
 ios/App/Podfile.lock
+
+# Supabase CLI local cache and migration backups (never commit, may contain credentials/data)
+supabase/.temp/
+supabase-migration-backup/
